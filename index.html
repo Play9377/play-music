@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>极简音乐播放器</title>
+    <style>
+    html{
+        	
+         background: url(u_3219772707_2029025645&fm_253&app_138&f_JPEG-1.jpeg) no-repeat  fixed;
+         background-size: 100%;
+        }
+        #cat{
+        	margin-left: -80%;
+        	margin-bottom: -2%;
+        }
+        :root {
+            --brand: #1DB954; --bg:#99999930; --panel: rgba(24, 24, 24, 0.95);
+            --text-main: #FFFFFF; --text-dim: #b3b3b3; --border: rgba(255,255,255,0.1);
+        }
+        [data-theme="light"] {
+            --bg: #f5f5f7; --panel: rgba(255, 255, 255, 0.9);
+            --text-main: #1d1d1f; --text-dim: #86868b; --border: rgba(0,0,0,0.1);
+
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; transition: 0.5s; }
+
+        /* 工具栏 */
+        .top-tools { position: absolute; top: 20px; right: 30px; display: flex; gap: 10px; z-index: 100; }
+        .tool-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--text-dim); background: none; color: var(--text-main); cursor: pointer; font-size: 12px; }
+
+        /* 侧边栏 */
+        #sidebar { width: 260px; background: var(--panel); backdrop-filter: blur(20px); padding: 40px 20px; border-right: 1px solid var(--border); overflow-y: auto; }
+        .song-item { padding: 12px; cursor: pointer; border-radius: 6px; margin-bottom: 4px; color: var(--text-dim); font-size: 14px; }
+        .song-item.active { background: var(--brand); color: #000; font-weight: bold; }
+
+        /* 主界面 */
+        #main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 150px; }
+        #lrc-window { height: 350px; width: 80%; overflow: hidden; position: relative; mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent); }
+        #lrc-list { position: absolute; width: 100%; transition: transform 0.5s ease-out; top: 150px; text-align: center; }
+        .lrc-line { height: 50px; line-height: 50px; font-size: 18px; color: var(--text-dim); opacity: 0.3; transition: 0.3s; }
+        .lrc-line.active { color: var(--text-main); font-size: 26px; font-weight: bold; opacity: 1; transform: scale(1.1); }
+
+        /* 底部控制 */
+        #footer { 
+            position: fixed; bottom: 0; width: 100%; height: 140px; background: var(--panel); 
+            backdrop-filter: blur(30px); border-top: 1px solid var(--border);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 40px;
+        }
+        .prog-container { width: 100%; max-width: 600px; display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+        .prog-bar { flex: 1; height: 4px; background: rgba(128,128,128,0.3); border-radius: 2px; cursor: pointer; position: relative; }
+        #prog-fill { height: 100%; background: var(--brand); width: 0%; border-radius: 2px; }
+        .time { font-size: 11px; color: var(--text-dim); min-width: 35px; }
+
+        .ctrl-row { display: flex; align-items: center; gap: 30px; }
+        .btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 24px; }
+        #play-btn { background: var(--text-main); color: var(--bg); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .vol-wrap { display: flex; align-items: center; gap: 10px; margin-left: 20px; border-left: 1px solid var(--border); padding-left: 20px; }
+        input[type="range"] { accent-color: var(--brand); cursor: pointer; width: 80px; }
+
+        #donate-box { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal { background: var(--panel); padding: 30px; border-radius: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="top-tools">
+    <button class="tool-btn" onclick="toggleTheme()">🌓 主题</button>
+    <button class="tool-btn" onclick="document.getElementById('donate-box').style.display='flex'">☕ 赞助</button>
+</div>
+
+<div id="sidebar">
+    <h2 style="color:var(--brand); margin-bottom:20px; font-size:16px;">播放列表</h2>
+    <div id="playlist"></div>
+</div>
+
+<div id="main">
+    <div style="text-align:center; margin-bottom:25px;">
+        <h1 id="cur-title" style="font-size:28px;">就绪</h1>
+        <span id="mode-text" style="font-size:10px; color:var(--brand); border:1px solid var(--brand); padding:2px 8px; border-radius:10px;">列表循环</span>
+    </div>
+    <div id="lrc-window">
+        <div id="lrc-list"></div>
+    </div>
+    <div id="cat"><img src="80367b6b-cddf-47d5-900e-2d3b68fbe317.png" alt="" style="width:200px; height:200px;"></div>
+</div>
+
+<div id="footer">
+    <div class="prog-container">
+        <span class="time" id="t-cur">0:00</span>
+        <div class="prog-bar" onclick="seek(event)"><div id="prog-fill"></div></div>
+        <span class="time" id="t-total">0:00</span>
+    </div>
+    <div class="ctrl-row">
+        <button class="btn" id="m-btn" onclick="switchMode()">🔁</button>
+        <button class="btn" onclick="move(-1)">⏮</button>
+        <button id="play-btn" onclick="toggle()">▶</button>
+        <button class="btn" onclick="move(1)">⏭</button>
+        <div class="vol-wrap">
+            <span style="font-size:10px;">VOL</span>
+            <input type="range" min="0" max="1" step="0.05" value="0.5" oninput="audio.volume=this.value">
+        </div>
+    </div>
+</div>
+
+<div id="donate-box" onclick="this.style.display='none'"><div class="modal"><h3>感谢支持</h3><img src="wx.jpg" alt="" style="width:300px; height:350px;"><p style="font-size:12px;">点击关闭</p></div></div>
+
+<audio id="audio"></audio>
+<script>
+    // 歌词库
+    const lrcDB = {
+        "1.lrc": "[00:00.00]第一首歌\n[00:02.00]切歌自动播放已开启\n[00:04.00]享受音乐吧",
+        "2.lrc": "[00:00.00]第二首歌", "3.lrc": "[00:00.00]第三首歌", "4.lrc": "[00:00.00]第四首歌", "5.lrc": "[00:00.00]第五首歌"
+    };
+
+    const songs = [
+        { t: "一叶", f: "一叶.mp3", l: "一叶.lrc" },
+        { t: "谪仙", f: "谪仙.mp3", l: "谪仙.lrc" },
+        { t: "落花不过身外客，流水从来是凉薄", f: "落花不过身外客，流水从来是凉薄.mp3", l: "落花不过身外客，流水从来是凉薄.lrc" },
+        { t: "千鸟与目黑", f: "千鸟与目黑.mp3", l: "千鸟与目黑.lrc" },
+        { t: "海棠不记年", f: "海棠不记年.mp3", l: "海棠不记年.lrc" },
+        { t: "南关醉", f: "南关醉.mp3", l: "南关醉.lrc" },
+        { t: "不敢提及你的名字，怕扰了相思", f: "不敢提及你的名字，怕扰了相思.mp3", l: "不敢提及你的名字，怕扰了相思.lrc" },
+        { t: "君不在长江头，我也不在长江尾", f: "君不在长江头，我也不在长江尾.mp3", l: "君不在长江头，我也不在长江尾.lrc" },
+        { t: "吹梦到西洲", f: "吹梦到西洲 - 恋恋故人难,黄诗扶,妖扬.mp3", l: "吹梦到西洲.lrc" },
+        { t: "一直在等", f: "一直在等 - 本兮.mp3", l: "一直在等.lrc" },
+        { t: "Love Story (伴奏版)", f: "Love Story (伴奏版).mp3", l: "Love Story (伴奏版).lrc" },
+        { t: "追光者", f: "岑宁儿 - 追光者.mp3", l: "追光者.lrc" },
+        { t: "SpeXial - 心流感", f: "SpeXial - 心流感.mp3", l: "SpeXial - 心流感.lrc" },
+        { t: "不如 - 秦海清", f: "不如 - 秦海清.mp3", l: "不如 - 秦海清.lrc" },
+        { t: "放了你", f: "放了你.mp3", l: "放了你.lrc" },
+        { t: "后来遇见他", f: "后来遇见他_cococola.mp3", l: "后来遇见他.lrc" },
+        { t: "绝世优雅", f: "绝世优雅-蒋蒋.mp3", l: "绝世优雅.lrc" },
+        { t: "南山雪-叶里", f: "南山雪-叶里.mp3", l: "南山雪-叶里.lrc" },
+        { t: "樱花树下的约定", f: "樱花树下的约定（热搜版）.mp3", l: "樱花树下的约定.lrc" },
+        { t: "漠河舞厅", f: "漠河舞厅·2022.mp3", l: "漠河舞厅.lrc" },
+        { t: "爱似水仙_(合唱版)-张茜_半吨兄弟", f: "爱似水仙_(合唱版)-张茜_半吨兄弟.mp3", l: "爱似水仙_(合唱版)-张茜_半吨兄弟.lrc" },
+        { t: "风起相思雨落愁", f: "风起相思雨落愁.mp3", l: "风起相思雨落愁.lrc" },
+        { t: "童话镇（1.1氛围版）", f: "童话镇（1.1氛围版）.mp3", l: "童话镇（1.1氛围版）.lrc" },  
+        { t: "We Don't Talk Anymore", f: "We Don't Talk Anymore.mp3", l: "We Don't Talk Anymore.lrc" },
+        { t: "故事1983", f: "故事1983 - 蒋蒋.mp3", l: "故事1983.lrc" }
+
+    ];
+
+    let cur = 0, mode = 0, lrcs = [];
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('play-btn');
+
+    function init() {
+        document.getElementById('playlist').innerHTML = songs.map((s, i) => `<div class="song-item" id="item-${i}" onclick="play(${i}, true)">${i+1}. ${s.t}</div>`).join('');
+        play(0, false);
+    }
+
+    // 播放核心函数：shouldPlay 为 true 时切歌即播
+    function play(idx, shouldPlay) {
+        cur = idx;
+        audio.src = songs[idx].f;
+        document.getElementById('cur-title').innerText = songs[idx].t;
+        document.querySelectorAll('.song-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`item-${idx}`).classList.add('active');
+
+        // 加载歌词
+        const raw = lrcDB[songs[idx].l] || "[00:00.00]无歌词";
+        lrcs = raw.split('\n').map(line => {
+            const m = line.match(/\[(\d+):(\d+\.?\d*)\](.*)/);
+            return m ? { t: parseInt(m[1])*60 + parseFloat(m[2]), txt: m[3].trim() } : null;
+        }).filter(v => v);
+
+        document.getElementById('lrc-list').innerHTML = lrcs.map((l, i) => `<div class="lrc-line" id="l-${i}">${l.txt}</div>`).join('');
+        document.getElementById('lrc-list').style.transform = `translateY(0px)`;
+
+        if(shouldPlay) {
+            audio.play();
+            playBtn.innerText = "⏸";
+        }
+    }
+
+    audio.ontimeupdate = () => {
+        if(!audio.duration) return;
+        document.getElementById('prog-fill').style.width = (audio.currentTime / audio.duration) * 100 + "%";
+        document.getElementById('t-cur').innerText = fmt(audio.currentTime);
+        document.getElementById('t-total').innerText = fmt(audio.duration);
+
+        const idx = lrcs.findIndex((l, i) => audio.currentTime >= l.t && (!lrcs[i+1] || audio.currentTime < lrcs[i+1].t));
+        if(idx !== -1) {
+            document.querySelectorAll('.lrc-line').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(`l-${idx}`);
+            if(target) { target.classList.add('active'); document.getElementById('lrc-list').style.transform = `translateY(${-idx * 50}px)`; }
+        }
+    };
+
+    function toggle() { audio.paused ? (audio.play(), playBtn.innerText = "⏸") : (audio.pause(), playBtn.innerText = "▶"); }
+    function move(s) { 
+        let next = mode === 2 ? Math.floor(Math.random()*songs.length) : (cur + s + songs.length) % songs.length;
+        play(next, true); 
+    }
+    function seek(e) { audio.currentTime = (e.offsetX / e.currentTarget.offsetWidth) * audio.duration; }
+    function switchMode() { mode = (mode + 1) % 3; document.getElementById('m-btn').innerText = ["🔁", "🔂", "🔀"][mode]; document.getElementById('mode-text').innerText = ["列表循环", "单曲循环", "随机播放"][mode]; }
+    function fmt(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec < 10 ? '0' : ''}${sec}`; }
+    function toggleTheme() { document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); }
+    
+    audio.onended = () => mode === 1 ? play(cur, true) : move(1);
+    init();
+</script>
+</body>
+</html>
